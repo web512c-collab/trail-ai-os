@@ -7,11 +7,11 @@ This build environment targets **Tiny Core Linux 15.x** across **Dual x86 (32-bi
 | Component Layer | Storage Footprint (ISO) | RAM Impact (Idle) | Mount / Integration Strategy |
 | :--- | ---: | ---: | :--- |
 | Kernel (`vmlinuz64` / `vmlinuz`) + Initrd | 42 MB | ~48 MB | Built-in `binderfs`, `ntsync`, `binfmt_misc`, `IA32_EMULATION` |
-| Xorg + GPU Drivers + KDE Plasma Lite + Openbox Fallback | 310 MB | ~292 MB | Loop-mounted SquashFS (`/tmp/tcloop`) |
+| Xorg + GPU Drivers + KDE Plasma Lite + Openbox Fallback | 309 MB | ~292 MB | Loop-mounted SquashFS (`/tmp/tcloop`) |
 | Utilities, Browser (`falkon`), Wi-Fi, Bash/DBus | 116 MB | ~25 MB | Loop-mounted SquashFS (`/tmp/tcloop`) |
 | Windows Layer (**Wine 10+ WoW64** + Winetricks) | 217 MB | Embedded in core + /dev/ntsync | Baked into core SquashFS + kernel `binfmt_misc` |
 | Android Runtime (waydroid-cage) | 485 MB | 0 MB until APK launch | Kernel `binderfs` + SquashFS + OverlayFS |
-| **Total Hybrid ISO (BIOS + UEFI)** | **~1290 MB** | **~352 MB Idle** | Hybrid ISO9660 + GPT/MBR |
+| **Total Hybrid ISO (BIOS + UEFI)** | **~1289 MB** | **~352 MB Idle** | Hybrid ISO9660 + GPT/MBR |
 
 ---
 

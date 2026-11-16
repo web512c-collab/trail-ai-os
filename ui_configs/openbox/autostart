@@ -19,7 +19,11 @@ elif command -v xsetroot >/dev/null 2>&1; then
 fi
 
 command -v pulseaudio >/dev/null 2>&1 && pulseaudio --start --exit-idle-time=-1 &
-command -v tint2 >/dev/null 2>&1 && tint2 -c "$HOME/.config/tint2/tint2rc" &
+if command -v tint2 >/dev/null 2>&1; then
+  tint2 -c "$HOME/.config/tint2/tint2rc" &
+elif command -v wbar >/dev/null 2>&1; then
+  wbar &
+fi
 
 (sleep 1 && command -v volumeicon >/dev/null 2>&1 && volumeicon) &
 (sleep 1 && command -v nm-applet >/dev/null 2>&1 && nm-applet) &

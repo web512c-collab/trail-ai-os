@@ -94,13 +94,14 @@ test('generateAllArtifacts emits all 19 deliverables including kernel config, du
   assert.ok(byPath.has('ui_configs/mimeapps.list'));
 
   const buildScript = byPath.get('build_iso.sh')!;
-  assert.ok(buildScript.includes('firefox_ESR.tcz'));
+  assert.ok(buildScript.includes('firefox-ESR.tcz'));
   assert.ok(buildScript.includes('VOLUME_ID="MY_CUSTOM_TC"'));
   assert.ok(buildScript.includes('TARGET_ARCH="dual-x86-x86_64"'));
   assert.ok(buildScript.includes('bash.tcz'));
   assert.ok(buildScript.includes('dbus.tcz'));
   assert.ok(buildScript.includes('Xprogs.tcz'));
-  assert.ok(buildScript.includes('setxkbmap.tcz'));
+  assert.ok(buildScript.includes('Xorg-7.7-bin.tcz'));
+  assert.ok(buildScript.includes('Xorg-7.7-3d.tcz'));
   assert.ok(buildScript.includes('xkeyboard-config.tcz'));
   assert.ok(buildScript.includes('00-keyboard.conf'));
   assert.ok(buildScript.includes('Option "XkbLayout" "us,ara"'));

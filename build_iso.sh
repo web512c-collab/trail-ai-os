@@ -228,7 +228,7 @@ fetch_tcz_recursive() {
   local dest_tcz="${cache_sub}/${pkg}"
 
   if [[ ! -s "${dest_tcz}" ]]; then
-    if ! curl -fsSL --retry 2 "${tcz_url}" -o "${dest_tcz}"; then
+    if ! curl -fsSL --retry 2 --connect-timeout 15 --max-time 120 "${tcz_url}" -o "${dest_tcz}"; then
       if [[ "${optional_flag}" == "optional" ]]; then
         log_warn "[${arch_tag}] Optional extension ${pkg} not found on mirror; skipping."
         rm -f "${dest_tcz}"
@@ -240,14 +240,24 @@ fetch_tcz_recursive() {
     fi
   fi
 
-  if curl -fsSL "${tcz_url}.md5.txt" -o "${dest_tcz}.md5.txt" 2>/dev/null; then
-    (cd "${cache_sub}" && md5sum -c "${pkg}.md5.txt" >/dev/null 2>&1) || curl -fsSL "${tcz_url}" -o "${dest_tcz}"
+  if [[ ! -s "${dest_tcz}.md5.txt" ]]; then
+    curl -fsSL --connect-timeout 15 --max-time 30 "${tcz_url}.md5.txt" -o "${dest_tcz}.md5.txt" 2>/dev/null || rm -f "${dest_tcz}.md5.txt"
+  fi
+  if [[ -s "${dest_tcz}.md5.txt" ]]; then
+    (cd "${cache_sub}" && md5sum -c "${pkg}.md5.txt" >/dev/null 2>&1) || curl -fsSL --retry 2 --connect-timeout 15 --max-time 120 "${tcz_url}" -o "${dest_tcz}"
     cp "${dest_tcz}.md5.txt" "${dest_cde}/"
   fi
 
   cp "${dest_tcz}" "${dest_cde}/"
 
-  if curl -fsSL "${tcz_url}.dep" -o "${dest_tcz}.dep" 2>/dev/null; then
+  if [[ ! -f "${dest_tcz}.dep" ]] && [[ ! -f "${dest_tcz}.nodep" ]]; then
+    if ! curl -fsSL --connect-timeout 15 --max-time 30 "${tcz_url}.dep" -o "${dest_tcz}.dep" 2>/dev/null; then
+      rm -f "${dest_tcz}.dep"
+      : > "${dest_tcz}.nodep"
+    fi
+  fi
+
+  if [[ -s "${dest_tcz}.dep" ]]; then
     cp "${dest_tcz}.dep" "${dest_cde}/"
     while IFS= read -r dep || [[ -n "${dep}" ]]; do
       dep="${dep%%#*}"
@@ -271,45 +281,49 @@ bundle_extensions_for_arch() {
     "Xorg-7.7.tcz"
     "Xprogs.tcz"
     "Xlibs.tcz"
+    "Xorg-7.7-bin.tcz"
+    "Xorg-7.7-3d.tcz"
     "xf86-video-fbdev.tcz"
     "xf86-video-vesa.tcz"
     "xf86-input-libinput.tcz"
-    "setxkbmap.tcz"
     "xkeyboard-config.tcz"
-    "mesa-dri.tcz"
     "dejavu-fonts-ttf.tcz"
     "shared-mime-info.tcz"
     "desktop-file-utils.tcz"
   )
 
   if [[ "${INCLUDE_OPENBOX}" == "true" ]]; then
-    mandatory_pkgs+=("openbox.tcz" "tint2.tcz")
+    mandatory_pkgs+=("openbox.tcz" "flwm_topside.tcz")
   fi
 
   local optional_pkgs=(
     "xf86-video-intel.tcz"
     "xf86-video-amdgpu.tcz"
     "xf86-video-vmware.tcz"
-    "noto-fonts.tcz"
-    "rofi.tcz"
+    "notosans-fonts-ttf.tcz"
+    "wbar.tcz"
     "feh.tcz"
     "pulseaudio.tcz"
     "volumeicon.tcz"
-    "papirus-icon-theme.tcz"
-    "network-manager-applet.tcz"
+    "adwaita-icon-theme.tcz"
+    "lxde-icon-theme.tcz"
     "dolphin-lite.tcz"
-    "falkon.tcz"
     "konsole-lite.tcz"
     "leafpad.tcz"
     "htop.tcz"
-    "unzip.tcz"
     "p7zip.tcz"
     "tar.tcz"
     "zenity.tcz"
   )
 
+  if [[ "${arch_tag}" == "x86_64" ]]; then
+    optional_pkgs+=("falkon.tcz" "rofi.tcz" "unzip.tcz" "network-manager-applet.tcz")
+  else
+    optional_pkgs+=("firefox_getLatest.tcz" "tint2.tcz" "zip-unzip.tcz" "network_tray.tcz")
+  fi
+
   if [[ "${INCLUDE_WIFI}" == "true" ]]; then
-    optional_pkgs+=("wifi.tcz" "firmware-iwlwifi.tcz" "firmware-atheros.tcz" "firmware-rtlwifi.tcz")
+    optional_pkgs+=("wifi.tcz" "firmware-iwlwifi.tcz" "firmware-rtlwifi.tcz")
   fi
 
   : > "${cde_dir}/onboot.lst"
@@ -332,7 +346,7 @@ bundle_extensions_for_arch() {
       fi
     done
   else
-    for apkg in "qemu-kvm.tcz" "android-tools.tcz"; do
+    for apkg in "qemu.tcz" "qemu-kvm.tcz" "android-tools.tcz"; do
       fetch_tcz_recursive "${arch_tag}" "${apkg}" "optional" || true
     done
   fi
@@ -357,22 +371,36 @@ build_wine10_wow64_tcz() {
     local stage="${WINE10_DIR}/rootfs"
     mkdir -p "${stage}"
 
-    # Pull WineHQ 10.x WoW64 (handles both 32-bit x86 and 64-bit x86_64 Windows PE binaries)
-    if mmdebstrap --variant=minbase       --include="ca-certificates,curl,gnupg,${WINE_CHANNEL},winetricks"       --aptopt='APT::Install-Recommends "false"'       --setup-hook='mkdir -p "$1/etc/apt/keyrings" && curl -fsSL https://dl.winehq.org/wine-builds/winehq.key -o "$1/etc/apt/keyrings/winehq-archive.key"'       --essential-hook='printf "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main\n" > "$1/etc/apt/sources.list.d/winehq.list"'       bookworm "${stage}" http://deb.debian.org/debian; then
+    # Pull WineHQ 10+ WoW64 (supports both 32-bit x86 and 64-bit x86_64 Windows PE binaries)
+    if mmdebstrap --variant=minbase \
+      --architectures=amd64,i386 \
+      --include="ca-certificates,curl,${WINE_CHANNEL},winetricks" \
+      --aptopt='APT::Install-Recommends "false"' \
+      --dpkgopt='path-exclude=/usr/share/doc/*' \
+      --dpkgopt='path-exclude=/usr/share/man/*' \
+      --setup-hook='mkdir -p "$1/etc/apt/keyrings" "$1/etc/apt/sources.list.d" && curl -fsSL https://dl.winehq.org/wine-builds/winehq.key -o "$1/etc/apt/keyrings/winehq-archive.asc" && printf "deb [signed-by=/etc/apt/keyrings/winehq-archive.asc] https://dl.winehq.org/wine-builds/debian/ bookworm main\n" > "$1/etc/apt/sources.list.d/winehq.list"' \
+      bookworm "${stage}" http://deb.debian.org/debian; then
 
       local wver
       wver="$("${stage}/opt/wine-stable/bin/wine" --version 2>/dev/null || "${stage}/opt/wine-staging/bin/wine" --version 2>/dev/null || echo 'wine-10.0')"
       log_info "Packaged Wine version: ${wver}"
 
-      mkdir -p "${WINE10_DIR}/tcz/usr/local/wine10" "${WINE10_DIR}/tcz/usr/local/bin"
+      mkdir -p "${WINE10_DIR}/tcz/usr/local/wine10/extralibs" "${WINE10_DIR}/tcz/usr/local/bin"
       cp -a "${stage}/opt/wine-"* "${WINE10_DIR}/tcz/usr/local/wine10/" 2>/dev/null || cp -a "${stage}/usr/"* "${WINE10_DIR}/tcz/usr/local/wine10/"
+      for libdir in "${stage}/usr/lib/x86_64-linux-gnu" "${stage}/usr/lib/i386-linux-gnu"; do
+        if [[ -d "${libdir}" ]]; then
+          cp -a "${libdir}" "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/" 2>/dev/null || true
+          rm -f "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/$(basename "${libdir}")/libc.so"*                 "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/$(basename "${libdir}")/ld-linux"* 2>/dev/null || true
+        fi
+      done
+      [[ -x "${stage}/usr/bin/winetricks" ]] && cp -a "${stage}/usr/bin/winetricks" "${WINE10_DIR}/tcz/usr/local/bin/" || true
 
       cat > "${WINE10_DIR}/tcz/usr/local/bin/wine" <<'EOF'
 #!/usr/bin/env bash
-WINE_ROOT="$(find /usr/local/wine10 -maxdepth 2 -type f -name wine | head -n1)"
+WINE_ROOT="$(find /usr/local/wine10 -maxdepth 3 -type f -name wine | head -n1)"
 WINE_BASE="$(dirname "$(dirname "$WINE_ROOT")")"
 export PATH="${WINE_BASE}/bin:${PATH}"
-export LD_LIBRARY_PATH="${WINE_BASE}/lib:${WINE_BASE}/lib64:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="${WINE_BASE}/lib:${WINE_BASE}/lib64:/usr/local/wine10/extralibs/x86_64-linux-gnu:/usr/local/wine10/extralibs/i386-linux-gnu:${LD_LIBRARY_PATH:-}"
 export WINENTSYNC=1
 exec "${WINE_ROOT}" "$@"
 EOF
