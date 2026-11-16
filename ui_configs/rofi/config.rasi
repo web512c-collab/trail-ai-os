@@ -1,0 +1,55 @@
+configuration {
+  modi: "drun,run,window";
+  show-icons: true;
+  icon-theme: "Papirus";
+  font: "DejaVu Sans 11";
+  drun-display-format: "{name}";
+  terminal: "konsole";
+}
+
+* {
+  bg: #0f172af0;
+  fg: #f8fafc;
+  border-col: #334155;
+  accent: #0284c7;
+  row-alt: #1e293b;
+  background-color: transparent;
+  text-color: @fg;
+}
+
+window {
+  width: 540px;
+  background-color: @bg;
+  border: 1px solid;
+  border-color: @border-col;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+inputbar {
+  children: [prompt, entry];
+  padding: 8px 12px;
+  background-color: @row-alt;
+  border-radius: 6px;
+  margin: 0 0 12px 0;
+}
+
+prompt {
+  margin: 0 8px 0 0;
+  text-color: @accent;
+}
+
+listview {
+  lines: 8;
+  scrollbar: false;
+}
+
+element {
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+element selected {
+  background-color: @accent;
+  text-color: #ffffff;
+}

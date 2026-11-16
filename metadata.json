@@ -1,0 +1,6 @@
+{
+  "name": "CorePure64 OS Architect",
+  "description": "Production build environment, automation scripts, and desktop configuration studio for custom Tiny Core Linux (CorePure64) hybrid ISOs with Wine and Android compatibility.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

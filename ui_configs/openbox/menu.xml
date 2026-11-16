@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="CorePure64">
+    <item label="Applications (Rofi)">
+      <action name="Execute"><command>rofi -show drun</command></action>
+    </item>
+    <item label="Switch to KDE Plasma Lite">
+      <action name="Execute"><command>startplasma-lite</command></action>
+    </item>
+    <separator />
+    <item label="Terminal">
+      <action name="Execute"><command>konsole</command></action>
+    </item>
+    <item label="File Manager">
+      <action name="Execute"><command>dolphin</command></action>
+    </item>
+    <item label="Web Browser">
+      <action name="Execute"><command>falkon</command></action>
+    </item>
+    <item label="System Monitor (htop)">
+      <action name="Execute"><command>konsole -e htop</command></action>
+    </item>
+    <separator />
+    <menu id="keyboard-menu" label="Keyboard Layout (EN,AR)">
+      <item label="English (Primary) + Arabic (Secondary) [Alt+Shift]">
+        <action name="Execute"><command>setxkbmap -model pc105 -layout "us,ara" -variant "," -option "" -option "grp:alt_shift_toggle"</command></action>
+      </item>
+      <item label="English Only (us)">
+        <action name="Execute"><command>setxkbmap -model pc105 -layout "us" -option ""</command></action>
+      </item>
+    </menu>
+    <menu id="compat-menu" label="Compatibility Layers">
+      <item label="Run Windows EXE (Wine 10)">
+        <action name="Execute"><command>/usr/local/bin/wine-exe-runner</command></action>
+      </item>
+      <item label="Wine Configuration (winecfg)">
+        <action name="Execute"><command>winecfg</command></action>
+      </item>
+      <item label="Launch Android Desktop">
+        <action name="Execute"><command>/usr/local/bin/android-apk-runner</command></action>
+      </item>
+    </menu>
+    <separator />
+    <item label="Reconfigure Openbox">
+      <action name="Reconfigure"/>
+    </item>
+    <item label="Exit Session">
+      <action name="Exit"/>
+    </item>
+  </menu>
+</openbox_menu>

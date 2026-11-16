@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Android APK Installer
+Comment=Install and launch Android .apk packages seamlessly
+Exec=/usr/local/bin/android-apk-runner %f
+Icon=android-studio
+Terminal=false
+Type=Application
+Categories=System;Emulator;
+MimeType=application/vnd.android.package-archive;

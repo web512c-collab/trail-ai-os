@@ -1,0 +1,6 @@
+[Default Applications]
+application/x-ms-dos-executable=wine-exe-runner.desktop
+application/x-dosexec=wine-exe-runner.desktop
+application/x-msdownload=wine-exe-runner.desktop
+application/x-msi=wine-exe-runner.desktop
+application/vnd.android.package-archive=android-apk-installer.desktop

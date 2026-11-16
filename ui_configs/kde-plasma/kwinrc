@@ -1,0 +1,15 @@
+[Compositing]
+AnimationSpeed=3
+Backend=OpenGL
+Enabled=true
+GLCore=false
+LatencyPolicy=Low
+OpenGLIsUnsafe=false
+WindowsBlockCompositing=true
+
+[Effect-Blur]
+BlurStrength=5
+
+[Windows]
+Placement=Smart
+FocusPolicy=ClickToFocus

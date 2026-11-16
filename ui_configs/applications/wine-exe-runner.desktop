@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Windows EXE Runner (Wine 10)
+Comment=Execute 32-bit & 64-bit Windows .exe and .msi binaries natively via Wine 10 WoW64
+Exec=/usr/local/bin/wine-exe-runner %f
+Icon=wine
+Terminal=false
+Type=Application
+Categories=System;Emulator;
+MimeType=application/x-ms-dos-executable;application/x-dosexec;application/x-msdownload;application/x-msi;

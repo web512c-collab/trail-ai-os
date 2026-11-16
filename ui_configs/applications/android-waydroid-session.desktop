@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Android Desktop (Waydroid)
+Comment=Launch containerized Android environment inside X11
+Exec=/usr/local/bin/android-apk-runner
+Icon=phone
+Terminal=false
+Type=Application
+Categories=System;Emulator;

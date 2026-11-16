@@ -1,0 +1,14 @@
+[General]
+ColorScheme=BreezeDark
+Name=Breeze
+widgetStyle=Breeze
+font=DejaVu Sans,10,-1,5,50,0,0,0,0,0
+fixed=IBM Plex Mono,10,-1,5,50,0,0,0,0,0
+
+[Icons]
+Theme=breeze-dark
+
+[KDE]
+AnimationDurationFactor=0.5
+LookAndFeelPackage=org.kde.breezedark.desktop
+SingleClick=false
