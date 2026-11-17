@@ -52,6 +52,7 @@ ISOHDPFX_BIN=""
 LDLINUX_C32=""
 MENU_C32=""
 LIBUTIL_C32=""
+LIBCOM32_C32=""
 IFCPU64_C32=""
 TC_KERNEL_VER_64=""
 TC_KERNEL_VER_32=""
@@ -113,9 +114,10 @@ check_host_deps() {
   LDLINUX_C32="$(locate_syslinux_file "ldlinux.c32" "${bios_dirs[@]}" || true)"
   MENU_C32="$(locate_syslinux_file "menu.c32" "${bios_dirs[@]}" || true)"
   LIBUTIL_C32="$(locate_syslinux_file "libutil.c32" "${bios_dirs[@]}" || true)"
+  LIBCOM32_C32="$(locate_syslinux_file "libcom32.c32" "${bios_dirs[@]}" || true)"
   IFCPU64_C32="$(locate_syslinux_file "ifcpu64.c32" "${bios_dirs[@]}" || true)"
 
-  for bin_var in ISOLINUX_BIN ISOHDPFX_BIN LDLINUX_C32 MENU_C32 LIBUTIL_C32; do
+  for bin_var in ISOLINUX_BIN ISOHDPFX_BIN LDLINUX_C32 MENU_C32 LIBUTIL_C32 LIBCOM32_C32; do
     if [[ -z "${!bin_var}" ]]; then
       log_error "Could not locate Syslinux file for ${bin_var}. Ensure isolinux and syslinux-common are installed."
       exit 1
@@ -369,17 +371,18 @@ build_wine10_wow64_tcz() {
   if command -v mmdebstrap >/dev/null 2>&1; then
     log_info "Assembling Wine 10+ WoW64 (${WINE_CHANNEL}) from WineHQ Debian repository..."
     local stage="${WINE10_DIR}/rootfs"
+    local wine_key="${WINE10_DIR}/winehq-archive.asc"
     mkdir -p "${stage}"
+    curl -fsSL --retry 2 --connect-timeout 15 https://dl.winehq.org/wine-builds/winehq.key -o "${wine_key}"
 
     # Pull WineHQ 10+ WoW64 (supports both 32-bit x86 and 64-bit x86_64 Windows PE binaries)
     if mmdebstrap --variant=minbase \
       --architectures=amd64,i386 \
-      --include="ca-certificates,curl,${WINE_CHANNEL},winetricks" \
+      --include="ca-certificates,curl,${WINE_CHANNEL}" \
       --aptopt='APT::Install-Recommends "false"' \
       --dpkgopt='path-exclude=/usr/share/doc/*' \
       --dpkgopt='path-exclude=/usr/share/man/*' \
-      --setup-hook='mkdir -p "$1/etc/apt/keyrings" "$1/etc/apt/sources.list.d" && curl -fsSL https://dl.winehq.org/wine-builds/winehq.key -o "$1/etc/apt/keyrings/winehq-archive.asc" && printf "deb [signed-by=/etc/apt/keyrings/winehq-archive.asc] https://dl.winehq.org/wine-builds/debian/ bookworm main\n" > "$1/etc/apt/sources.list.d/winehq.list"' \
-      bookworm "${stage}" http://deb.debian.org/debian; then
+      bookworm "${stage}" "http://deb.debian.org/debian" "deb [signed-by=${wine_key}] https://dl.winehq.org/wine-builds/debian/ bookworm main"; then
 
       local wver
       wver="$("${stage}/opt/wine-stable/bin/wine" --version 2>/dev/null || "${stage}/opt/wine-staging/bin/wine" --version 2>/dev/null || echo 'wine-10.0')"
@@ -390,10 +393,12 @@ build_wine10_wow64_tcz() {
       for libdir in "${stage}/usr/lib/x86_64-linux-gnu" "${stage}/usr/lib/i386-linux-gnu"; do
         if [[ -d "${libdir}" ]]; then
           cp -a "${libdir}" "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/" 2>/dev/null || true
-          rm -f "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/$(basename "${libdir}")/libc.so"*                 "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/$(basename "${libdir}")/ld-linux"* 2>/dev/null || true
+          rm -f "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/$(basename "${libdir}")/libc.so"* \
+                "${WINE10_DIR}/tcz/usr/local/wine10/extralibs/$(basename "${libdir}")/ld-linux"* 2>/dev/null || true
         fi
       done
-      [[ -x "${stage}/usr/bin/winetricks" ]] && cp -a "${stage}/usr/bin/winetricks" "${WINE10_DIR}/tcz/usr/local/bin/" || true
+      curl -fsSL --connect-timeout 15 https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks -o "${WINE10_DIR}/tcz/usr/local/bin/winetricks" 2>/dev/null && chmod +x "${WINE10_DIR}/tcz/usr/local/bin/winetricks" || true
+      rm -rf "${stage}"
 
       cat > "${WINE10_DIR}/tcz/usr/local/bin/wine" <<'EOF'
 #!/usr/bin/env bash
@@ -407,7 +412,8 @@ EOF
       chmod +x "${WINE10_DIR}/tcz/usr/local/bin/wine"
       ln -sf /usr/local/bin/wine "${WINE10_DIR}/tcz/usr/local/bin/wine64"
 
-      mksquashfs "${WINE10_DIR}/tcz" "${cached_wine10}" -comp xz -b 256K -noappend >/dev/null
+      mksquashfs "${WINE10_DIR}/tcz" "${cached_wine10}" -comp gzip -b 128K -processors 2 -mem 256M -noappend >/dev/null
+      rm -rf "${WINE10_DIR}"
       cp "${cached_wine10}" "${ISO_ROOT}/cde/optional/"
       (cd "${ISO_ROOT}/cde/optional" && md5sum wine10-wow64.tcz > wine10-wow64.tcz.md5.txt)
       if [[ "${WINE_ONDEMAND}" == "true" ]] && [[ "${EMBED_COMPAT_IN_CORE}" != "true" ]]; then
@@ -420,10 +426,13 @@ EOF
     fi
   fi
 
-  log_warn "WineHQ 10 mmdebstrap unavailable; falling back to Tiny Core mirror wine.tcz"
-  if fetch_tcz_recursive "x86_64" "wine.tcz" "optional" && [[ -f "${ISO_ROOT}/cde/optional/wine.tcz" ]]; then
-    printf 'wine.tcz\n' >> "${ISO_ROOT}/cde/onboot.lst"
-  fi
+  log_warn "WineHQ 10 mmdebstrap unavailable; falling back to Tiny Core mirror wine-latest.tcz / wine.tcz"
+  for fallback_wine in "wine-latest.tcz" "wine.tcz"; do
+    if fetch_tcz_recursive "x86_64" "${fallback_wine}" "optional" && [[ -f "${ISO_ROOT}/cde/optional/${fallback_wine}" ]]; then
+      printf '%s\n' "${fallback_wine}" >> "${ISO_ROOT}/cde/onboot.lst"
+      break
+    fi
+  done
 }
 
 build_kde_plasma_lite_tcz() {
@@ -457,6 +466,7 @@ build_kde_plasma_lite_tcz() {
 
     mkdir -p "${PLASMA_DIR}/tcz_pkg/usr/local/kde-lite" "${PLASMA_DIR}/tcz_pkg/usr/local/bin" "${PLASMA_DIR}/tcz_pkg/etc/ld.so.conf.d"
     mv "${stage}/usr/"* "${PLASMA_DIR}/tcz_pkg/usr/local/kde-lite/" || true
+    rm -rf "${stage}"
     printf '/usr/local/kde-lite/lib/x86_64-linux-gnu\n/usr/local/kde-lite/lib\n' > "${PLASMA_DIR}/tcz_pkg/etc/ld.so.conf.d/kde-lite.conf"
 
     cat > "${PLASMA_DIR}/tcz_pkg/usr/local/bin/startplasma-lite" <<'EOF'
@@ -471,7 +481,8 @@ exec "${KDE_LITE_PREFIX}/bin/startplasma-x11"
 EOF
     chmod +x "${PLASMA_DIR}/tcz_pkg/usr/local/bin/startplasma-lite"
 
-    mksquashfs "${PLASMA_DIR}/tcz_pkg" "${cached_plasma}" -comp xz -b 256K -noappend >/dev/null
+    mksquashfs "${PLASMA_DIR}/tcz_pkg" "${cached_plasma}" -comp gzip -b 128K -processors 2 -mem 256M -noappend >/dev/null
+    rm -rf "${PLASMA_DIR}"
     cp "${cached_plasma}" "${ISO_ROOT}/cde/optional/"
     (cd "${ISO_ROOT}/cde/optional" && md5sum kde-plasma-lite.tcz > kde-plasma-lite.tcz.md5.txt)
     printf 'kde-plasma-lite.tcz\n' >> "${ISO_ROOT}/cde/onboot.lst"
@@ -653,7 +664,7 @@ fi
 EOF
   chmod +x "${skel}/.xsession"
 
-  mksquashfs "${OVERLAY_DIR}" "${ISO_ROOT}/cde/optional/custom-ui-overlay.tcz" -comp xz -b 256K -noappend >/dev/null
+  mksquashfs "${OVERLAY_DIR}" "${ISO_ROOT}/cde/optional/custom-ui-overlay.tcz" -comp xz -b 256K -processors 2 -mem 256M -noappend >/dev/null
   (cd "${ISO_ROOT}/cde/optional" && md5sum custom-ui-overlay.tcz > custom-ui-overlay.tcz.md5.txt)
   printf 'custom-ui-overlay.tcz\n' >> "${ISO_ROOT}/cde/onboot.lst"
 
@@ -761,6 +772,7 @@ setup_bios_isolinux() {
   cp "${LDLINUX_C32}"  "${ISO_ROOT}/boot/isolinux/"
   cp "${MENU_C32}"     "${ISO_ROOT}/boot/isolinux/"
   cp "${LIBUTIL_C32}"  "${ISO_ROOT}/boot/isolinux/"
+  cp "${LIBCOM32_C32}" "${ISO_ROOT}/boot/isolinux/"
   [[ -n "${IFCPU64_C32}" ]] && cp "${IFCPU64_C32}" "${ISO_ROOT}/boot/isolinux/"
 
   cat > "${ISO_ROOT}/boot/isolinux/isolinux.cfg" <<EOF
@@ -826,8 +838,13 @@ set default=0
 set timeout=5
 
 insmod all_video
-insmod gfxterm
-terminal_output gfxterm
+insmod font
+if loadfont unicode; then
+  insmod gfxterm
+  terminal_output gfxterm
+else
+  terminal_output console
+fi
 
 if cpuid -l; then
   menuentry "CorePure64 (x86_64) — KDE Plasma Lite + Wine 10 + Android APK" {
@@ -857,18 +874,23 @@ menuentry "Safe Graphics Mode (nomodeset)" {
 EOF
 
   cat > "${EFI_WORK}/grub-embed.cfg" <<'EOF'
-search --no-floppy --file --set=root /boot/grub/grub.cfg
-set prefix=($root)/boot/grub
+if ! search --no-floppy --label --set=root COREPURE64_OS; then
+  if ! search --no-floppy --file --set=root /boot/vmlinuz64; then
+    search --no-floppy --file --set=root /boot/vmlinuz
+  fi
+fi
 configfile ($root)/boot/grub/grub.cfg
 EOF
 
-  local grub_mods="part_gpt part_msdos iso9660 fat ext2 normal boot linux configfile search search_label search_fs_uuid all_video efi_gop efi_uga gfxterm cpuid"
+  local grub_mods="part_gpt part_msdos iso9660 fat ext2 normal boot linux configfile search search_fs_file search_label search_fs_uuid all_video efi_gop efi_uga video_bochs video_cirrus font gfxterm cpuid gzio echo test"
+  local grub_fonts=""
+  [[ -f /usr/share/grub/unicode.pf2 ]] && grub_fonts="unicode"
 
   grub-mkstandalone \
     --format=x86_64-efi \
     --output="${EFI_WORK}/BOOTX64.EFI" \
     --locales="" \
-    --fonts="" \
+    --fonts="${grub_fonts}" \
     --modules="${grub_mods}" \
     "boot/grub/grub.cfg=${EFI_WORK}/grub-embed.cfg"
 
@@ -884,7 +906,7 @@ EOF
       --format=i386-efi \
       --output="${EFI_WORK}/BOOTIA32.EFI" \
       --locales="" \
-      --fonts="" \
+      --fonts="${grub_fonts}" \
       --modules="${grub_mods}" \
       "boot/grub/grub.cfg=${EFI_WORK}/grub-embed.cfg"
     mcopy -i "${efi_img}" "${EFI_WORK}/BOOTIA32.EFI" ::/EFI/BOOT/BOOTIA32.EFI
